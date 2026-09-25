@@ -52,8 +52,8 @@ class CyberButton(QPushButton):
         if self.is_active:
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {c}33;
-                    color: #FFFFFF;
+                    background-color: {c}22;
+                    color: {c};
                     border: 1px solid {c};
                     font-family: 'Consolas', monospace;
                     font-weight: bold;
@@ -62,16 +62,21 @@ class CyberButton(QPushButton):
                     border-radius: 3px;
                 }}
                 QPushButton:hover {{
-                    background-color: {c}66;
+                    background-color: {c}33;
+                    color: #FFFFFF;
+                    border: 1px solid #FFFFFF;
+                }}
+                QPushButton:pressed {{
+                    background-color: {c}44;
                     border: 1px solid #FFFFFF;
                 }}
             """)
         else:
             self.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: #0E1424EE;
-                    color: #FFFFFF;
-                    border: 1px solid {c}88;
+                    background-color: rgba(14, 20, 36, 0.65);
+                    color: #A0B8C8;
+                    border: 1px solid {c}44;
                     font-family: 'Consolas', monospace;
                     font-weight: bold;
                     font-size: {fs}px;
@@ -79,14 +84,17 @@ class CyberButton(QPushButton):
                     border-radius: 3px;
                 }}
                 QPushButton:hover {{
-                    background-color: {c}33;
+                    background-color: rgba(14, 20, 36, 0.85);
                     color: #FFFFFF;
                     border: 1px solid {c};
                 }}
                 QPushButton:pressed {{
-                    background-color: {c}55;
+                    background-color: rgba(14, 20, 36, 0.95);
+                    color: #FFFFFF;
+                    border: 1px solid #FFFFFF;
                 }}
             """)
+
 
 class CyberPomodoroWindow(QWidget):
     """
@@ -191,15 +199,16 @@ class CyberPomodoroWindow(QWidget):
         self.btn_mode_focus.clicked.connect(lambda: self.switch_mode(self.MODE_FOCUS))
         mode_layout.addWidget(self.btn_mode_focus)
 
-        self.btn_mode_short = CyberButton(f"{self.short_break_min:02d}M 短休", primary_color="#00FF88", is_active=False, font_size=13)
+        self.btn_mode_short = CyberButton(f"{self.short_break_min:02d}M 短休", primary_color="#00F3FF", is_active=False, font_size=13)
         self.btn_mode_short.setFixedHeight(32)
         self.btn_mode_short.clicked.connect(lambda: self.switch_mode(self.MODE_SHORT_BREAK))
         mode_layout.addWidget(self.btn_mode_short)
 
-        self.btn_mode_long = CyberButton(f"{self.long_break_min:02d}M 长休", primary_color="#B026FF", is_active=False, font_size=13)
+        self.btn_mode_long = CyberButton(f"{self.long_break_min:02d}M 长休", primary_color="#00F3FF", is_active=False, font_size=13)
         self.btn_mode_long.setFixedHeight(32)
         self.btn_mode_long.clicked.connect(lambda: self.switch_mode(self.MODE_LONG_BREAK))
         mode_layout.addWidget(self.btn_mode_long)
+
 
         self.main_layout.addLayout(mode_layout)
 
@@ -279,52 +288,39 @@ class CyberPomodoroWindow(QWidget):
         self.btn_start.setText("▶ 开始" if mode == self.MODE_FOCUS else "▶ 开始休息")
         self.btn_start.set_active(True)
 
+        color = "#00F3FF"
+        self.bar_progress.rail_color = color
+        self.bar_progress.blade_color = color
+        self.lbl_digits.setStyleSheet(self._digit_style(color))
+        self.btn_dec.set_color(color)
+        self.btn_inc.set_color(color)
+
         if mode == self.MODE_FOCUS:
             self.total_seconds = self.focus_min * 60
-            color = "#00F3FF"
-            self.bar_progress.rail_color = color
-            self.bar_progress.blade_color = color
             self.bar_progress.tag = "FOCUS"
-            self.bar_progress.update()
             self.btn_mode_focus.set_active(True)
             self.btn_mode_short.set_active(False)
             self.btn_mode_long.set_active(False)
-            self.lbl_digits.setStyleSheet(self._digit_style(color))
             self.lbl_led.setText("● FOCUS READY")
             self.lbl_led.setStyleSheet("color: #00F3FF; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
-            self.btn_dec.set_color(color)
-            self.btn_inc.set_color(color)
         elif mode == self.MODE_SHORT_BREAK:
             self.total_seconds = self.short_break_min * 60
-            color = "#00FF88"
-            self.bar_progress.rail_color = color
-            self.bar_progress.blade_color = color
             self.bar_progress.tag = "REST"
-            self.bar_progress.update()
             self.btn_mode_focus.set_active(False)
             self.btn_mode_short.set_active(True)
             self.btn_mode_long.set_active(False)
-            self.lbl_digits.setStyleSheet(self._digit_style(color))
             self.lbl_led.setText("● SHORT BREAK")
-            self.lbl_led.setStyleSheet("color: #00FF88; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
-            self.btn_dec.set_color("#00F3FF")
-            self.btn_inc.set_color("#00F3FF")
+            self.lbl_led.setStyleSheet("color: #00F3FF; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
         else: # long_break
             self.total_seconds = self.long_break_min * 60
-            color = "#B026FF"
-            self.bar_progress.rail_color = color
-            self.bar_progress.blade_color = color
             self.bar_progress.tag = "LONG"
-            self.bar_progress.update()
             self.btn_mode_focus.set_active(False)
             self.btn_mode_short.set_active(False)
             self.btn_mode_long.set_active(True)
-            self.lbl_digits.setStyleSheet(self._digit_style(color))
             self.lbl_led.setText("● LONG BREAK")
-            self.lbl_led.setStyleSheet("color: #B026FF; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
-            self.btn_dec.set_color("#00F3FF")
-            self.btn_inc.set_color("#00F3FF")
+            self.lbl_led.setStyleSheet("color: #00F3FF; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
 
+        self.bar_progress.update()
         self.remaining_seconds = self.total_seconds
         self._update_display()
 
@@ -358,9 +354,9 @@ class CyberPomodoroWindow(QWidget):
             self.btn_dec.setEnabled(False)
             self.btn_inc.setEnabled(False)
             tag = "● FOCUSING" if self.current_mode == self.MODE_FOCUS else "● RESTING"
-            c = "#00F3FF" if self.current_mode == self.MODE_FOCUS else "#00FF88"
             self.lbl_led.setText(tag)
-            self.lbl_led.setStyleSheet(f"color: {c}; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
+            self.lbl_led.setStyleSheet("color: #00F3FF; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
+
 
     def reset_timer(self):
         """Resets the remaining time to current mode duration."""
