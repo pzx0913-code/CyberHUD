@@ -26,6 +26,10 @@ SWP_NOACTIVATE = 0x0010
 
 def format_speed(bps):
     """Format bytes per second into human readable string."""
+    try:
+        bps = max(0.0, float(bps))
+    except Exception:
+        bps = 0.0
     if bps < 1024:
         return f"{bps:.0f} B/s"
     elif bps < 1024 * 1024:
@@ -34,6 +38,7 @@ def format_speed(bps):
         return f"{bps / (1024 * 1024):.2f} MB/s"
     else:
         return f"{bps / (1024 * 1024 * 1024):.2f} GB/s"
+
 
 class VPSConfigDialog(QDialog):
     def __init__(self, config_manager, parent=None):

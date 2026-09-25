@@ -260,19 +260,16 @@ class CyberPomodoroWindow(QWidget):
     def adjust_time(self, delta_sec: int):
         """
         Adjusts the countdown time by delta_sec (+/- 60s).
+        Only allowed when paused or not running, preventing accidental misclicks during active focus.
         Minimum: 60s (1 min), Maximum: 120 min.
         """
+        if self.is_running:
+            return
         new_sec = max(60, min(120 * 60, self.remaining_seconds + delta_sec))
         self.remaining_seconds = new_sec
-
-        # Fix: When not running, adjusting time sets initial total duration (progress stays 0%)
-        if not self.is_running:
-            self.total_seconds = new_sec
-        else:
-            if new_sec > self.total_seconds:
-                self.total_seconds = new_sec
-
+        self.total_seconds = new_sec
         self._update_display()
+
 
     def switch_mode(self, mode: str):
         """Switches the session mode (focus / short_break / long_break)."""
@@ -350,12 +347,16 @@ class CyberPomodoroWindow(QWidget):
             self.is_running = False
             self.timer.stop()
             self.btn_start.setText("▶ 继续")
+            self.btn_dec.setEnabled(True)
+            self.btn_inc.setEnabled(True)
             self.lbl_led.setText("● PAUSED")
             self.lbl_led.setStyleSheet("color: #FFB800; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
         else:
             self.is_running = True
             self.timer.start()
             self.btn_start.setText("|| 暂停")
+            self.btn_dec.setEnabled(False)
+            self.btn_inc.setEnabled(False)
             tag = "● FOCUSING" if self.current_mode == self.MODE_FOCUS else "● RESTING"
             c = "#00F3FF" if self.current_mode == self.MODE_FOCUS else "#00FF88"
             self.lbl_led.setText(tag)
@@ -365,6 +366,8 @@ class CyberPomodoroWindow(QWidget):
         """Resets the remaining time to current mode duration."""
         self.is_running = False
         self.timer.stop()
+        self.btn_dec.setEnabled(True)
+        self.btn_inc.setEnabled(True)
         if self.current_mode == self.MODE_FOCUS:
             self.total_seconds = self.focus_min * 60
         elif self.current_mode == self.MODE_SHORT_BREAK:
@@ -372,10 +375,11 @@ class CyberPomodoroWindow(QWidget):
         else:
             self.total_seconds = self.long_break_min * 60
         self.remaining_seconds = self.total_seconds
-        self.btn_start.setText("▶ 开始")
+        self.btn_start.setText("▶ 开始专注" if self.current_mode == self.MODE_FOCUS else "▶ 开始休息")
         self.lbl_led.setText("● RESET")
         self.lbl_led.setStyleSheet("color: #FFB800; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
         self._update_display()
+
 
     def skip_phase(self):
         """Skips current phase to the next one."""

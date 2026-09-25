@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 
 DEFAULT_CONFIG = {
     "window": {

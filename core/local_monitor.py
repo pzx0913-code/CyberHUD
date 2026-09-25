@@ -142,10 +142,11 @@ class LocalMonitorThread(QThread):
 
     def stop(self):
         self.running = False
+        self.wait(1500)
         global HAS_NVML
         if HAS_NVML:
             try:
                 pynvml.nvmlShutdown()
             except Exception:
                 pass
-        self.wait(1500)
+

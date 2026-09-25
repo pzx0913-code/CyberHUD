@@ -133,7 +133,8 @@ def main():
     ]
     for val, text in opacity_presets:
         act_op = op_menu.addAction(text)
-        act_op.triggered.connect(lambda checked, v=val: hud.set_bg_opacity(v))
+        act_op.triggered.connect(lambda checked, v=val: (hud.set_bg_opacity(v), pomo.update()))
+
 
     # Autostart toggle action
     act_autostart = tray_menu.addAction("🚀 开机登录自动启动")
