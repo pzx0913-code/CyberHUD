@@ -9,11 +9,17 @@
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-00F3FF?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-FF0055?style=for-the-badge&logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-00FF88?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![Release](https://img.shields.io/badge/Release-v1.0.0_Download-00F3FF?style=for-the-badge&logo=github)](https://github.com/pzx0913-code/CyberHUD/releases/tag/v1.0.0)
 [![License](https://img.shields.io/badge/License-MIT-FFB800?style=for-the-badge)](LICENSE)
 
 <br/>
 
+[👉 **【点击立即下载 v1.0.0 Windows 便携免安装版 ZIP】**](https://github.com/pzx0913-code/CyberHUD/releases/download/v1.0.0/CyberHUD-v1.0.0-windows-x64.zip)
+
+<br/>
+
 <img src="docs/preview.png" alt="CyberHUD Preview" width="600" />
+
 
 </div>
 
@@ -89,12 +95,14 @@
 ## 🚀 快速开始 / Quick Start
 
 ### 方式 A：使用独立便携可执行程序 (.exe)
-1. 从 Releases 页面下载 `CyberHUD.zip` 并解压到任意目录（例如 `D:\AI\CyberHUD`）。
+1. 从 [GitHub Releases 页面](https://github.com/pzx0913-code/CyberHUD/releases/tag/v1.0.0) 下载最新版 `CyberHUD-v1.0.0-windows-x64.zip` 并解压到任意目录（例如 `D:\AI\CyberHUD`）。
 2. 解压后包含：
    - `CyberHUD.exe`：主程序
    - `config.json`：配置文件
    - `app_icon.ico`：应用图标
+   - `使用说明.txt`：新手说明书
 3. 双击 `CyberHUD.exe` 即可运行！可在系统托盘右键菜单开启“开机自启”。
+
 
 ### 方式 B：从源码运行 (Run from Source)
 
