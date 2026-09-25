@@ -20,10 +20,16 @@
 
 <img src="docs/preview.png" alt="CyberHUD Preview" width="600" />
 
-
 </div>
 
+> [!TIP]
+> ### 📥 新手下载与运行须知 (Download & Launch Notice)
+> * 🚀 **即开即用（无需配置 Python）**：如果你只是想在电脑上使用本软件，**请勿**点击右上角绿色的 `Code -> Download ZIP`（那是给开发者的源代码）。请直接前往 [**GitHub Releases**](https://github.com/pzx0913-code/CyberHUD/releases/tag/v1.0.0) 下载 **`CyberHUD-v1.0.0-windows-x64.zip`**，解压后双击 `CyberHUD.exe` 就能直接玩！
+> * 🛡️ **关于 Windows SmartScreen 拦截提示**：由于个人独立开源软件未购买商业代码签名数字证书，首次双击运行时，Windows Defender 或系统可能会提示*“Windows 已保护你的电脑”*或*“未知发布者”*。本项目 **100% 纯源代码公开透明**，绝无任何恶意行为，请放心点击【**更多信息**】➔【**仍要运行**】即可。
+> * 🎯 **系统托盘与托盘控制**：双击启动后，软件会自动置于最底层的桌面壁纸上并开启鼠标穿透。若需要移动位置或开启开机自启，请在右下角任务栏托盘中**右键点击 CyberHUD 图标**进行控制。
+
 ---
+
 
 ## 📖 目录 / Table of Contents
 - [✨ 项目亮点 / Highlights](#-项目亮点--highlights)
