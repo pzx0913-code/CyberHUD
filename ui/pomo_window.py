@@ -310,8 +310,8 @@ class CyberPomodoroWindow(QWidget):
             self.lbl_digits.setStyleSheet(self._digit_style(color))
             self.lbl_led.setText("● SHORT BREAK")
             self.lbl_led.setStyleSheet("color: #00FF88; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
-            self.btn_dec.set_color(color)
-            self.btn_inc.set_color(color)
+            self.btn_dec.set_color("#00F3FF")
+            self.btn_inc.set_color("#00F3FF")
         else: # long_break
             self.total_seconds = self.long_break_min * 60
             color = "#B026FF"
@@ -325,8 +325,8 @@ class CyberPomodoroWindow(QWidget):
             self.lbl_digits.setStyleSheet(self._digit_style(color))
             self.lbl_led.setText("● LONG BREAK")
             self.lbl_led.setStyleSheet("color: #B026FF; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
-            self.btn_dec.set_color(color)
-            self.btn_inc.set_color(color)
+            self.btn_dec.set_color("#00F3FF")
+            self.btn_inc.set_color("#00F3FF")
 
         self.remaining_seconds = self.total_seconds
         self._update_display()
@@ -482,10 +482,8 @@ class CyberPomodoroWindow(QWidget):
         
         bg_opacity = self.config_manager.get("window", {}).get("bg_opacity", 0.45)
         
-        if self.is_flashing:
-            border_color = "#FFB800" if (self.flash_step % 2 == 0) else "#00FF88"
-        else:
-            border_color = "#00F3FF" if self.current_mode == self.MODE_FOCUS else ("#00FF88" if self.current_mode == self.MODE_SHORT_BREAK else "#B026FF")
+        # 固定边框为统一的赛博青蓝 (#00F3FF)，与上方 HUD 主窗口保持严格视觉一致
+        border_color = "#00F3FF"
 
         CyberPainter.draw_cyber_frame(
             painter=painter,
@@ -495,3 +493,4 @@ class CyberPomodoroWindow(QWidget):
             cut=16.0,
             bg_opacity=bg_opacity
         )
+
