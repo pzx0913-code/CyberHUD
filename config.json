@@ -1,0 +1,50 @@
+{
+    "window": {
+        "x": 2225,
+        "y": 225,
+        "width": 330,
+        "always_on_top": false,
+        "locked": false,
+        "opacity": 1.0,
+        "magnetic_snap": true,
+        "click_through": true,
+        "stay_on_bottom": true,
+        "bg_opacity": 0.45
+    },
+    "theme": {
+        "primary_color": "#00F3FF",
+        "secondary_color": "#FF0055",
+        "warning_color": "#FFB800",
+        "success_color": "#00FF88",
+        "bg_color": "#0B0E17",
+        "border_glow": true,
+        "font_family": "Consolas"
+    },
+    "hardware": {
+        "refresh_interval_ms": 1000,
+        "history_points": 35
+    },
+    "vps": {
+        "enabled": true,
+        "collapsed": false,
+        "refresh_interval_s": 4,
+        "type": "ssh",
+        "host": "",
+        "port": 22,
+        "username": "root",
+        "auth_type": "password",
+        "password": "",
+        "key_path": "",
+        "http_url": "",
+        "name": "VPS-NODE-01"
+    },
+    "pomodoro": {
+        "enabled": true,
+        "locked": true,
+        "auto_dock": true,
+        "focus_min": 25,
+        "short_break_min": 5,
+        "long_break_min": 15,
+        "sound_alert": true
+    }
+}
