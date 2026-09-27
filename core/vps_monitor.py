@@ -1,6 +1,7 @@
 import time
 import socket
 import re
+import threading
 from PyQt6.QtCore import QThread, pyqtSignal
 
 class VPSMonitorThread(QThread):
@@ -82,6 +83,26 @@ class VPSMonitorThread(QThread):
             }
         return {"status": "ERROR", "ping_ms": None}
 
+    def _probe_ssh_rtt(self, timeout=2.0):
+        """Measure real cryptographic RTT through the SSH session, bypassing local TUN/proxy."""
+        if not self.ssh_client:
+            return None
+        transport = self.ssh_client.get_transport()
+        if not transport or not transport.is_active():
+            return None
+        rtt_holder = [None]
+        def _worker():
+            try:
+                t0 = time.perf_counter()
+                transport.global_request('keepalive@openssh.com', wait=True)
+                rtt_holder[0] = round((time.perf_counter() - t0) * 1000.0, 1)
+            except Exception:
+                pass
+        th = threading.Thread(target=_worker, daemon=True)
+        th.start()
+        th.join(timeout=timeout)
+        return rtt_holder[0]
+
     def query_ssh(self, host, port, username, password=None, key_path=None, timeout=4.0):
         """Query remote VPS via SSH without needing any software installed on VPS."""
         import paramiko
@@ -103,11 +124,19 @@ class VPSMonitorThread(QThread):
                     "ping_ms": None
                 }
 
+        # Measure true end-to-end RTT through the encrypted SSH tunnel
+        # This completely bypasses local TUN/VPN proxies that falsely reply to TCP SYN in <1ms
+        ssh_rtt = self._probe_ssh_rtt(timeout=2.0)
+
         # Query /proc/stat and memory via free -b (procps standard)
         cmd = "grep 'cpu ' /proc/stat; free -b 2>/dev/null || grep -E 'MemTotal|MemFree|Buffers|Cached|SReclaimable' /proc/meminfo"
         try:
+            t0 = time.perf_counter()
             stdin, stdout, stderr = self.ssh_client.exec_command(cmd, timeout=timeout)
             output = stdout.read().decode("utf-8", errors="ignore")
+            exec_time = round((time.perf_counter() - t0) * 1000.0, 1)
+            if ssh_rtt is None:
+                ssh_rtt = exec_time
             
             # Parse CPU
             cpu_percent = 0.0
@@ -166,6 +195,7 @@ class VPSMonitorThread(QThread):
 
             return {
                 "status": "ONLINE",
+                "ping_ms": ssh_rtt,
                 "cpu_percent": round(cpu_percent, 1),
                 "mem_percent": mem_percent,
                 "mem_used_gb": mem_used_gb,
@@ -217,12 +247,7 @@ class VPSMonitorThread(QThread):
                 continue
 
             try:
-                # 1. Measure true network RTT (ICMP / TCP SYN roundtrip)
-                rtt = self.measure_latency(host, port)
-                if rtt is not None:
-                    result["ping_ms"] = round(rtt, 1)
-
-                # 2. Query detailed metrics based on vps_type
+                # Query detailed metrics based on vps_type
                 if vps_type == "ssh":
                     ssh_res = self.query_ssh(
                         host=host,
@@ -232,20 +257,26 @@ class VPSMonitorThread(QThread):
                         key_path=cfg.get("key_path", "")
                     )
                     result.update(ssh_res)
-                    if ssh_res.get("status") == "ONLINE" and rtt is not None:
-                        result["ping_ms"] = round(rtt, 1)
+                    # If SSH probe did not return ping_ms, fallback to measure_latency
+                    if result.get("ping_ms") is None:
+                        fallback_rtt = self.measure_latency(host, port)
+                        if fallback_rtt is not None:
+                            result["ping_ms"] = round(fallback_rtt, 1)
 
                 elif vps_type == "http":
                     http_url = cfg.get("http_url", "")
                     if http_url:
                         http_res = self.query_http(http_url)
                         result.update(http_res)
-                        if rtt is not None:
-                            result["ping_ms"] = round(rtt, 1)
+                        if result.get("ping_ms") is None:
+                            fallback_rtt = self.measure_latency(host, port)
+                            if fallback_rtt is not None:
+                                result["ping_ms"] = round(fallback_rtt, 1)
                     else:
                         result["status"] = "UNCONFIGURED"
 
                 else: # ping
+                    rtt = self.measure_latency(host, port)
                     if rtt is not None:
                         result["status"] = "ONLINE"
                         result["ping_ms"] = round(rtt, 1)
