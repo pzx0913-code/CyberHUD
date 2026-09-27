@@ -122,6 +122,20 @@ def main():
     act_drag = tray_menu.addAction("🎯 调整窗口位置 (临时允许拖动 15秒)")
     act_drag.triggered.connect(lambda: hud.enter_drag_mode(15))
 
+    # Click-through toggle action
+    act_ct = tray_menu.addAction("🖱️ 鼠标穿透模式 (开启穿透/关闭可直接拖拽)")
+    act_ct.setCheckable(True)
+    is_ct = config_mgr.get("window", {}).get("click_through", True)
+    act_ct.setChecked(is_ct)
+    def on_toggle_click_through(checked):
+        config_mgr.set("window", "click_through", checked)
+        if checked:
+            hud.enable_click_through()
+        else:
+            hud.disable_click_through()
+    act_ct.triggered.connect(on_toggle_click_through)
+
+
     # Background Opacity Menu (Text & lines stay 100% solid)
     op_menu = tray_menu.addMenu("🌓 底板透明度 (文字始终高亮清晰)")
     opacity_presets = [

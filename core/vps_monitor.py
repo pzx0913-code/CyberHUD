@@ -39,22 +39,29 @@ class VPSMonitorThread(QThread):
             res = subprocess.run(
                 ['ping', str(host), '-n', '1', '-w', str(int(timeout * 1000))],
                 capture_output=True,
+                text=True,
                 errors='ignore',
                 creationflags=subprocess.CREATE_NO_WINDOW
             )
-            out = res.stdout
+            if res.returncode != 0:
+                return None
+
+            out = res.stdout or ""
+            if "100% 丢失" in out or "100% loss" in out or "无法访问目标主机" in out or "Destination host unreachable" in out or "请求超时" in out or "timed out" in out:
+                return None
+
             if '<1ms' in out or '< 1ms' in out or '<1 ms' in out:
                 return 0.5
-            m = re.search(r'(?:time|时间)[=<]?\s*(\d+)\s*ms', out, re.IGNORECASE)
+
+            m = re.search(r'(?:time|时间)[=<]\s*(\d+(?:\.\d+)?)\s*ms', out, re.IGNORECASE)
             if m:
-                return float(m.group(1))
-            m2 = re.search(r'(\d+)\s*ms', out)
-            if m2:
-                return float(m2.group(1))
+                val = float(m.group(1))
+                return max(0.5, val)
         except Exception:
             pass
 
         return None
+
 
     def query_http(self, url, timeout=3.0):
         """Query lightweight HTTP endpoint."""

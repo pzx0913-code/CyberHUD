@@ -285,9 +285,13 @@ class CyberHUDWindow(QWidget):
         self.update()
 
     def apply_desktop_mode(self):
-        """Pin to bottom once and enable click-through without repeating timers."""
+        """Pin to bottom once and apply configured click-through setting."""
         self.send_to_bottom()
-        self.enable_click_through()
+        w_cfg = self.config_manager.get("window", {})
+        if w_cfg.get("click_through", True):
+            self.enable_click_through()
+        else:
+            self.disable_click_through()
 
     def enable_click_through(self):
         """Enable Windows Click-Through (clicks pass completely through)."""
@@ -300,6 +304,18 @@ class CyberHUDWindow(QWidget):
         )
         self.lbl_status_led.setText("● DESKTOP")
         self.lbl_status_led.setStyleSheet("color: #00FF88; font-family: 'Consolas'; font-size: 11px;")
+
+    def disable_click_through(self):
+        """Disable Windows Click-Through (window can be clicked and interacted with)."""
+        hwnd = int(self.winId())
+        extended_style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+        ctypes.windll.user32.SetWindowLongW(
+            hwnd,
+            GWL_EXSTYLE,
+            (extended_style & ~WS_EX_TRANSPARENT) | WS_EX_LAYERED
+        )
+        self.lbl_status_led.setText("● ACTIVE")
+        self.lbl_status_led.setStyleSheet("color: #00F3FF; font-family: 'Consolas'; font-size: 11px;")
 
     def send_to_bottom(self):
         """Pins the window to the bottom level of all normal windows."""
@@ -323,30 +339,35 @@ class CyberHUDWindow(QWidget):
         self.drag_mode_timer.start(duration_sec * 1000)
 
     def exit_drag_mode(self):
-        """Restore permanent pass-through and bottom layer."""
+        """Restore permanent pass-through or configured click-through mode."""
         self.is_in_drag_mode = False
         self.drag_mode_timer.stop()
         self.apply_desktop_mode()
 
-    # --- Mouse Events (active only when in temporary drag mode) ---
+    # --- Mouse Events (active when in drag mode OR when click_through is disabled) ---
     def mousePressEvent(self, event):
-        if self.is_in_drag_mode and event.button() == Qt.MouseButton.LeftButton:
+        can_drag = self.is_in_drag_mode or (not self.config_manager.get("window", {}).get("click_through", True))
+        if can_drag and event.button() == Qt.MouseButton.LeftButton:
             self.drag_position = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             event.accept()
 
     def mouseMoveEvent(self, event):
-        if self.is_in_drag_mode and event.buttons() == Qt.MouseButton.LeftButton and self.drag_position:
+        can_drag = self.is_in_drag_mode or (not self.config_manager.get("window", {}).get("click_through", True))
+        if can_drag and event.buttons() == Qt.MouseButton.LeftButton and self.drag_position:
             new_pos = event.globalPosition().toPoint() - self.drag_position
             self.move(new_pos)
             event.accept()
 
     def mouseReleaseEvent(self, event):
-        if self.is_in_drag_mode and event.button() == Qt.MouseButton.LeftButton:
+        can_drag = self.is_in_drag_mode or (not self.config_manager.get("window", {}).get("click_through", True))
+        if can_drag and event.button() == Qt.MouseButton.LeftButton:
             self.drag_position = None
             self._magnetic_snap()
             self._save_position()
-            self.exit_drag_mode()
+            if self.is_in_drag_mode:
+                self.exit_drag_mode()
             event.accept()
+
 
     def _magnetic_snap(self, snap_dist=25):
         screen = QApplication.primaryScreen()
@@ -419,14 +440,19 @@ class CyberHUDWindow(QWidget):
         name = data.get("name", "VPS")
         ping = data.get("ping_ms")
 
-        if ping is not None:
-            ping_str = "<1ms" if ping < 1.0 else f"{round(ping)}ms"
-        else:
+        # RTT display: Never show <1ms if offline, unconfigured or failed
+        if status not in ("ONLINE", "STANDBY") or ping is None or ping <= 0.0:
             ping_str = "--"
+        elif ping < 1.0:
+            ping_str = "<1ms"
+        else:
+            ping_str = f"{round(ping)}ms"
+
         status_color = "#00FF88" if status == "ONLINE" else ("#FFB800" if status == "STANDBY" else "#FF0055")
         
         self.row_vps_status.set_tag_text(f"[{name}]")
-        self.row_vps_status.update_stat(status, detail_text=f"RTT: {ping_str}", custom_color="#00F3FF")
+        self.row_vps_status.update_stat(status, detail_text=f"RTT: {ping_str}", custom_color=status_color)
+
 
         v_cpu = data.get("cpu_percent", 0.0)
         self.bar_vps_cpu.update_data(percent=v_cpu, value_text=f"{round(v_cpu)}%")
