@@ -93,7 +93,13 @@ class CyberButton(QPushButton):
                     color: #FFFFFF;
                     border: 1px solid #FFFFFF;
                 }}
+                QPushButton:disabled {{
+                    background-color: rgba(14, 20, 36, 0.4);
+                    color: #405566;
+                    border: 1px solid #1C2B3A;
+                }}
             """)
+
 
 
 class CyberPomodoroWindow(QWidget):
@@ -269,22 +275,37 @@ class CyberPomodoroWindow(QWidget):
     def adjust_time(self, delta_sec: int):
         """
         Adjusts the countdown time by delta_sec (+/- 60s).
-        Only allowed when paused or not running, preventing accidental misclicks during active focus.
         Minimum: 60s (1 min), Maximum: 120 min.
+        Works seamlessly anytime!
         """
-        if self.is_running:
-            return
         new_sec = max(60, min(120 * 60, self.remaining_seconds + delta_sec))
         self.remaining_seconds = new_sec
-        self.total_seconds = new_sec
-        self._update_display()
 
+        if not self.is_running:
+            self.total_seconds = new_sec
+            mins = new_sec // 60
+            if self.current_mode == self.MODE_FOCUS:
+                self.focus_min = mins
+                self.btn_mode_focus.setText(f"{mins}M 专注")
+            elif self.current_mode == self.MODE_SHORT_BREAK:
+                self.short_break_min = mins
+                self.btn_mode_short.setText(f"{mins:02d}M 短休")
+            elif self.current_mode == self.MODE_LONG_BREAK:
+                self.long_break_min = mins
+                self.btn_mode_long.setText(f"{mins:02d}M 长休")
+        else:
+            if new_sec > self.total_seconds:
+                self.total_seconds = new_sec
+
+        self._update_display()
 
     def switch_mode(self, mode: str):
         """Switches the session mode (focus / short_break / long_break)."""
         self.current_mode = mode
         self.is_running = False
         self.timer.stop()
+        self.btn_dec.setEnabled(True)
+        self.btn_inc.setEnabled(True)
         self.btn_start.setText("▶ 开始" if mode == self.MODE_FOCUS else "▶ 开始休息")
         self.btn_start.set_active(True)
 
@@ -339,24 +360,21 @@ class CyberPomodoroWindow(QWidget):
 
     def toggle_timer(self):
         """Starts or pauses the timer."""
+        self.btn_dec.setEnabled(True)
+        self.btn_inc.setEnabled(True)
         if self.is_running:
             self.is_running = False
             self.timer.stop()
             self.btn_start.setText("▶ 继续")
-            self.btn_dec.setEnabled(True)
-            self.btn_inc.setEnabled(True)
             self.lbl_led.setText("● PAUSED")
             self.lbl_led.setStyleSheet("color: #FFB800; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
         else:
             self.is_running = True
             self.timer.start()
             self.btn_start.setText("|| 暂停")
-            self.btn_dec.setEnabled(False)
-            self.btn_inc.setEnabled(False)
             tag = "● FOCUSING" if self.current_mode == self.MODE_FOCUS else "● RESTING"
             self.lbl_led.setText(tag)
             self.lbl_led.setStyleSheet("color: #00F3FF; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
-
 
     def reset_timer(self):
         """Resets the remaining time to current mode duration."""
@@ -376,11 +394,12 @@ class CyberPomodoroWindow(QWidget):
         self.lbl_led.setStyleSheet("color: #FFB800; font-family: 'Consolas'; font-size: 12px; font-weight: bold;")
         self._update_display()
 
-
     def skip_phase(self):
         """Skips current phase to the next one."""
         self.timer.stop()
         self.is_running = False
+        self.btn_dec.setEnabled(True)
+        self.btn_inc.setEnabled(True)
         if self.current_mode == self.MODE_FOCUS:
             if (self.completed_pomos + 1) % self.target_pomos == 0:
                 self.switch_mode(self.MODE_LONG_BREAK)
@@ -400,7 +419,10 @@ class CyberPomodoroWindow(QWidget):
     def _handle_completed(self):
         self.timer.stop()
         self.is_running = False
+        self.btn_dec.setEnabled(True)
+        self.btn_inc.setEnabled(True)
         self._trigger_flash_alert()
+
 
         if self.sound_alert:
             try:
