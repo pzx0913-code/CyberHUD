@@ -6,25 +6,26 @@ DEFAULT_CONFIG = {
     "window": {
         "x": 80,
         "y": 80,
-        "width": 320,
-        "always_on_top": True,
+        "width": 330,
+        "always_on_top": False,
         "locked": False,
-        "opacity": 0.92,
+        "opacity": 1.0,
         "magnetic_snap": True,
-        "click_through": False
+        "click_through": False,
+        "bg_opacity": 0.85
     },
     "theme": {
-        "primary_color": "#00F3FF",      # Cyber Cyan
-        "secondary_color": "#FF0055",    # Cyber Magenta
-        "warning_color": "#FFB800",      # Warning Amber
-        "success_color": "#00FF88",      # Success Green
-        "bg_color": "#0B0E17",           # Deep Space Black
-        "border_glow": True,
-        "font_family": "Consolas"
+        "primary_color": "#7DB4FF",      # Restrained Glacier-Blue accent
+        "secondary_color": "#E55353",    # Danger red
+        "warning_color": "#E6A23C",      # Warning amber
+        "success_color": "#4EC28B",      # Online green
+        "bg_color": "#111215",           # Frosted charcoal base
+        "border_glow": False,
+        "font_family": "Segoe UI Variable Display"
     },
     "hardware": {
         "refresh_interval_ms": 1000,
-        "history_points": 30
+        "history_points": 36
     },
     "vps": {
         "enabled": True,

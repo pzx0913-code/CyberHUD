@@ -1,7 +1,7 @@
 {
     "window": {
-        "x": 2225,
-        "y": 225,
+        "x": 80,
+        "y": 80,
         "width": 330,
         "always_on_top": false,
         "locked": false,
@@ -9,20 +9,20 @@
         "magnetic_snap": true,
         "click_through": true,
         "stay_on_bottom": true,
-        "bg_opacity": 0.45
+        "bg_opacity": 0.85
     },
     "theme": {
-        "primary_color": "#00F3FF",
-        "secondary_color": "#FF0055",
-        "warning_color": "#FFB800",
-        "success_color": "#00FF88",
-        "bg_color": "#0B0E17",
-        "border_glow": true,
-        "font_family": "Consolas"
+        "primary_color": "#7DB4FF",
+        "secondary_color": "#E55353",
+        "warning_color": "#E6A23C",
+        "success_color": "#4EC28B",
+        "bg_color": "#111215",
+        "border_glow": false,
+        "font_family": "Segoe UI Variable Display"
     },
     "hardware": {
         "refresh_interval_ms": 1000,
-        "history_points": 35
+        "history_points": 36
     },
     "vps": {
         "enabled": true,

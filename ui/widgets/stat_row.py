@@ -1,96 +1,90 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt
-from ui.widgets.cyber_bar import CyberBar
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import Qt, QPointF, QRectF
+from PyQt6.QtGui import QPainter, QBrush, QFont, QColor
+
+from ui.cyber_painter import Theme, hex_to_qcolor
+
 
 class StatRow(QWidget):
-    def __init__(self, tag="CPU", color="#00F3FF", show_bar=True, parent=None):
+    """
+    Minimal remote node header: Node name left, compact ms latency + status dot + state right.
+    """
+
+    def __init__(self, tag="VPS", color=Theme.TEXT_PRIMARY, show_bar=False, parent=None):
         super().__init__(parent)
-        self.tag = tag
-        self.color = color
+        self.tag_text = self._clean_tag(tag)
+        self.detail_text = "--"
+        self.value_text = "待机"
+        self.status_color = Theme.WARNING
         self.show_bar = show_bar
-        self.current_color = "#FFFFFF"
-        self._init_ui()
+        self.setFixedHeight(22)
 
-    def _init_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 4, 0, 6)
-        layout.setSpacing(5)
+    @staticmethod
+    def _clean_tag(text: str) -> str:
+        s = str(text).strip()
+        if s.startswith("[") and s.endswith("]") and len(s) >= 2:
+            s = s[1:-1].strip()
+        return s
 
-        # Header Row: [TAG]    [Detail]  [Main Value]
-        header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(0, 0, 0, 0)
+    def set_tag_text(self, text: str):
+        cleaned = self._clean_tag(text)
+        if self.tag_text != cleaned:
+            self.tag_text = cleaned
+            self.update()
 
-        # Tag label
-        self.lbl_tag = QLabel(f"[{self.tag}]")
-        self.lbl_tag.setWordWrap(False)
-        self.lbl_tag.setStyleSheet(f"""
-            QLabel {{
-                color: {self.color};
-                font-family: 'Consolas', 'Segoe UI', monospace;
-                font-weight: bold;
-                font-size: 13px;
-            }}
-        """)
-        header_layout.addWidget(self.lbl_tag)
+    def update_stat(self, value_text: str, detail_text: str = "", percent: float = 0.0, custom_color: str = None):
+        changed = False
+        if self.value_text != value_text:
+            self.value_text = value_text
+            changed = True
+        if detail_text is not None and self.detail_text != detail_text:
+            self.detail_text = detail_text
+            changed = True
+        if custom_color and self.status_color != custom_color:
+            self.status_color = custom_color
+            changed = True
+        if changed:
+            self.update()
 
-        # Detail text (e.g. 8.6G / 31.8G or 38°C)
-        self.lbl_detail = QLabel("")
-        self.lbl_detail.setWordWrap(False)
-        self.lbl_detail.setStyleSheet("""
-            QLabel {{
-                color: #A0B3C6;
-                font-family: 'Consolas', 'Segoe UI', monospace;
-                font-size: 12px;
-            }}
-        """)
-        header_layout.addWidget(self.lbl_detail)
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
 
-        header_layout.addStretch()
+        w = float(self.width())
+        h = float(self.height())
+        if w <= 10 or h <= 4:
+            return
 
-        # Primary value label (e.g. 35.8%)
-        self.lbl_value = QLabel("0.0%")
-        self.lbl_value.setWordWrap(False)
-        self.lbl_value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self.lbl_value.setStyleSheet("""
-            QLabel {{
-                color: #FFFFFF;
-                font-family: 'Consolas', 'Segoe UI', monospace;
-                font-weight: bold;
-                font-size: 14px;
-            }}
-        """)
-        header_layout.addWidget(self.lbl_value)
+        # 1. Rightmost status label
+        painter.setFont(Theme.ui_font(12, QFont.Weight.Normal))
+        status_w = painter.fontMetrics().horizontalAdvance(self.value_text)
+        status_rect = QRectF(w - status_w, 0.0, status_w, h)
+        status_qcol = hex_to_qcolor(self.status_color, 255)
+        painter.setPen(status_qcol)
+        painter.drawText(status_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self.value_text)
 
-        layout.addLayout(header_layout)
+        # 2. Live status dot (6px diameter, 5px left of status text)
+        dot_cx = w - status_w - 5.0 - 3.0
+        dot_cy = h * 0.5
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(status_qcol))
+        painter.drawEllipse(QPointF(dot_cx, dot_cy), 3.0, 3.0)
 
-        # Optional Cyber Bar
-        if self.show_bar:
-            self.bar = CyberBar(color=self.color)
-            layout.addWidget(self.bar)
-        else:
-            self.bar = None
+        # 3. Latency detail (10px left of dot)
+        detail_w = 0.0
+        if self.detail_text:
+            painter.setFont(Theme.display_font(13, QFont.Weight.Normal))
+            detail_w = painter.fontMetrics().horizontalAdvance(self.detail_text)
+            detail_right = dot_cx - 3.0 - 10.0
+            detail_rect = QRectF(0.0, 0.0, max(0.0, detail_right), h)
+            painter.setPen(hex_to_qcolor(Theme.TEXT_MUTED, 255))
+            painter.drawText(detail_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self.detail_text)
 
-    def set_tag_text(self, text):
-        self.lbl_tag.setText(text)
-        self.lbl_tag.setMinimumWidth(self.lbl_tag.fontMetrics().horizontalAdvance(text) + 8)
-
-    def update_stat(self, value_text, detail_text="", percent=0.0, custom_color=None):
-        if self.lbl_value.text() != value_text:
-            self.lbl_value.setText(value_text)
-            self.lbl_value.setMinimumWidth(self.lbl_value.fontMetrics().horizontalAdvance(value_text) + 8)
-        if detail_text and self.lbl_detail.text() != detail_text:
-            self.lbl_detail.setText(detail_text)
-            self.lbl_detail.setMinimumWidth(self.lbl_detail.fontMetrics().horizontalAdvance(detail_text) + 8)
-        if self.bar:
-            self.bar.set_value(percent)
-        if custom_color and custom_color != self.current_color:
-            self.current_color = custom_color
-            self.lbl_value.setStyleSheet(f"""
-                QLabel {{
-                    color: {custom_color};
-                    font-family: 'Consolas', 'Segoe UI', monospace;
-                    font-weight: bold;
-                    font-size: 16px;
-                }}
-            """)
-
+        # 4. Node Name on left
+        right_reserved = status_w + 5.0 + 6.0 + (10.0 + detail_w + 10.0 if detail_w else 10.0)
+        name_max_w = max(56.0, w - right_reserved)
+        painter.setFont(Theme.display_font(13, QFont.Weight.Medium))
+        elided_name = painter.fontMetrics().elidedText(self.tag_text, Qt.TextElideMode.ElideRight, int(name_max_w))
+        painter.setPen(QColor("#E4E7EE"))
+        painter.drawText(QRectF(0.0, 0.0, name_max_w, h), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, elided_name)
