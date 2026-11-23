@@ -329,7 +329,7 @@ class CyberHUDWindow(QWidget):
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(8)
 
-        self.lbl_title = QLabel("本机")
+        self.lbl_title = QLabel("SYS")
         self.lbl_title.setFont(Theme.ui_font(12, QFont.Weight.Medium))
         self.lbl_title.setStyleSheet(f"color: {Theme.TEXT_MUTED};")
         header_layout.addWidget(self.lbl_title)
@@ -346,7 +346,7 @@ class CyberHUDWindow(QWidget):
         self.main_layout.addWidget(self.hero_cpu)
 
         # 3. Full-width Style C Integrated-Fill Rows (内存 & GPU)
-        self.bar_ram = CyberMechBar(tag="内存", layout_mode="row")
+        self.bar_ram = CyberMechBar(tag="RAM", layout_mode="row")
         self.main_layout.addWidget(self.bar_ram)
 
         self.bar_gpu = CyberMechBar(tag="GPU", layout_mode="row")
@@ -372,12 +372,12 @@ class CyberHUDWindow(QWidget):
         self.bar_vps_cpu = CyberMechBar(tag="CPU", layout_mode="tile")
         vps_tiles_row.addWidget(self.bar_vps_cpu, stretch=1)
 
-        self.bar_vps_ram = CyberMechBar(tag="内存", layout_mode="tile")
+        self.bar_vps_ram = CyberMechBar(tag="RAM", layout_mode="tile")
         vps_tiles_row.addWidget(self.bar_vps_ram, stretch=1)
 
         vps_layout.addLayout(vps_tiles_row)
 
-        self.bar_vps_disk = CyberMechBar(tag="磁盘", layout_mode="row")
+        self.bar_vps_disk = CyberMechBar(tag="DISK", layout_mode="row")
         vps_layout.addWidget(self.bar_vps_disk)
 
         self.main_layout.addWidget(self.vps_widget)
