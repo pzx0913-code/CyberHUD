@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import sys
@@ -63,12 +64,13 @@ class ConfigManager:
 
     def load_config(self):
         if not os.path.exists(self.config_path):
-            self.save_config(DEFAULT_CONFIG)
-            return DEFAULT_CONFIG.copy()
+            default_cfg = copy.deepcopy(DEFAULT_CONFIG)
+            self.save_config(default_cfg)
+            return default_cfg
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 loaded = json.load(f)
-                merged = DEFAULT_CONFIG.copy()
+                merged = copy.deepcopy(DEFAULT_CONFIG)
                 for k, v in loaded.items():
                     if isinstance(v, dict) and k in merged:
                         merged[k].update(v)
@@ -77,7 +79,7 @@ class ConfigManager:
                 return merged
         except Exception as e:
             print(f"[ConfigManager] Error reading config, using defaults: {e}")
-            return DEFAULT_CONFIG.copy()
+            return copy.deepcopy(DEFAULT_CONFIG)
 
     def save_config(self, new_config=None):
         if new_config:

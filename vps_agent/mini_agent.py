@@ -57,17 +57,40 @@ class MetricsCollector:
         except Exception:
             return {"mem_percent": 0.0, "mem_used_gb": 0.0, "mem_total_gb": 0.0}
 
+    @classmethod
+    def get_disk(cls):
+        """Collect root `/` filesystem usage in binary GiB and percentage."""
+        try:
+            st = os.statvfs("/")
+            tot_b = st.f_blocks * st.f_frsize
+            free_b = st.f_bfree * st.f_frsize
+            used_b = max(0, tot_b - free_b)
+            if tot_b <= 0:
+                return {"disk_percent": 0.0, "disk_used_gb": 0.0, "disk_total_gb": 0.0}
+            return {
+                "disk_percent": round(max(0.0, min(100.0, (used_b / tot_b) * 100.0)), 1),
+                "disk_used_gb": round(used_b / (1024.0 ** 3), 2),
+                "disk_total_gb": round(tot_b / (1024.0 ** 3), 2),
+            }
+        except Exception:
+            return {"disk_percent": 0.0, "disk_used_gb": 0.0, "disk_total_gb": 0.0}
+
 class StatusHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in ["/", "/status"]:
             cpu = MetricsCollector.get_cpu()
             mem = MetricsCollector.get_memory()
+            disk = MetricsCollector.get_disk()
             payload = {
                 "status": "ONLINE",
                 "cpu": cpu,
                 "mem": mem["mem_percent"],
                 "mem_used_gb": mem["mem_used_gb"],
                 "mem_total_gb": mem["mem_total_gb"],
+                "disk": disk["disk_percent"],
+                "disk_percent": disk["disk_percent"],
+                "disk_used_gb": disk["disk_used_gb"],
+                "disk_total_gb": disk["disk_total_gb"],
                 "server_time": time.time()
             }
             body = json.dumps(payload).encode("utf-8")

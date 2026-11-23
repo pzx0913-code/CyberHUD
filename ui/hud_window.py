@@ -55,6 +55,14 @@ def _clean_gpu_name(raw_name: str) -> str:
     return s or "GPU"
 
 
+def _nonneg_float(val) -> float:
+    """Convert a metric value to a non-negative float, defaulting to 0.0."""
+    try:
+        return max(0.0, float(val)) if val is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
 class StatusDotBadge(QWidget):
     """Custom-painted 6px live status dot paired with crisp quiet label."""
 
@@ -368,6 +376,10 @@ class CyberHUDWindow(QWidget):
         vps_tiles_row.addWidget(self.bar_vps_ram, stretch=1)
 
         vps_layout.addLayout(vps_tiles_row)
+
+        self.bar_vps_disk = CyberMechBar(tag="磁盘", layout_mode="row")
+        vps_layout.addWidget(self.bar_vps_disk)
+
         self.main_layout.addWidget(self.vps_widget)
 
     def _load_saved_geometry(self):
@@ -573,14 +585,21 @@ class CyberHUDWindow(QWidget):
         self.row_vps_status.set_tag_text(name)
         self.row_vps_status.update_stat(status_label, detail_text=ping_str, custom_color=status_color)
 
-        v_cpu = data.get("cpu_percent", 0.0)
+        no_metrics = raw_status in ("OFFLINE", "ERROR", "UNCONFIGURED") or str(data.get("type", "")).lower() == "ping"
+        if no_metrics:
+            self.bar_vps_cpu.update_data(percent=0.0, value_text="--", animate=animate)
+            self.bar_vps_ram.update_data(percent=0.0, value_text="--", detail_text="", animate=animate)
+            self.bar_vps_disk.update_data(percent=0.0, value_text="--", detail_text="", animate=animate)
+            return
+
+        v_cpu = _nonneg_float(data.get("cpu_percent"))
         self.bar_vps_cpu.update_data(percent=v_cpu, value_text=f"{round(v_cpu)}%", animate=animate)
 
-        v_ram = data.get("mem_percent", 0.0)
-        v_used_mb = data.get("mem_used_mb", 0.0)
-        v_tot_mb = data.get("mem_total_mb", 0.0)
-        v_used_gb = data.get("mem_used_gb", 0.0)
-        v_tot_gb = data.get("mem_total_gb", 0.0)
+        v_ram = _nonneg_float(data.get("mem_percent"))
+        v_used_mb = _nonneg_float(data.get("mem_used_mb"))
+        v_tot_mb = _nonneg_float(data.get("mem_total_mb"))
+        v_used_gb = _nonneg_float(data.get("mem_used_gb"))
+        v_tot_gb = _nonneg_float(data.get("mem_total_gb"))
 
         if v_tot_mb > 0 and v_tot_mb < 1500:
             detail = f"{round(v_used_mb)}/{round(v_tot_mb)}M"
@@ -589,6 +608,30 @@ class CyberHUDWindow(QWidget):
         else:
             detail = ""
         self.bar_vps_ram.update_data(percent=v_ram, value_text=f"{round(v_ram)}%", detail_text=detail, animate=animate)
+
+        d_pct = min(100.0, _nonneg_float(data.get("disk_percent")))
+        d_used_gb = _nonneg_float(data.get("disk_used_gb"))
+        d_tot_gb = _nonneg_float(data.get("disk_total_gb"))
+
+        if d_tot_gb > 0:
+            if d_tot_gb >= 1024.0:
+                disk_detail = f"{d_used_gb / 1024.0:.1f} / {d_tot_gb / 1024.0:.1f} TB"
+            elif d_tot_gb < 1.0:
+                disk_detail = f"{round(d_used_gb * 1024)} / {round(d_tot_gb * 1024)} MB"
+            else:
+                disk_detail = f"{d_used_gb:.1f} / {d_tot_gb:.1f} GB"
+            disk_val = f"{round(d_pct)}%"
+        else:
+            disk_detail = ""
+            d_pct = 0.0
+            disk_val = "0%"
+
+        self.bar_vps_disk.update_data(
+            percent=d_pct,
+            value_text=disk_val,
+            detail_text=disk_detail,
+            animate=animate,
+        )
 
     def paintEvent(self, event):
         painter = QPainter(self)

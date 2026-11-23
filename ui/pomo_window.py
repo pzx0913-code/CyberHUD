@@ -507,10 +507,11 @@ class CyberPomodoroWindow(QWidget):
 
     def adjust_time(self, delta_sec: int):
         """Adjust countdown time anytime (+/- 60s or +/- 300s). Bounds: 1 min..120 min."""
+        was_untouched = (not self.is_running) and (self.remaining_seconds == self.total_seconds)
         new_sec = max(60, min(120 * 60, self.remaining_seconds + delta_sec))
         self.remaining_seconds = new_sec
 
-        if not self.is_running:
+        if was_untouched:
             self.total_seconds = new_sec
             mins = new_sec // 60
             if self.current_mode == self.MODE_FOCUS:

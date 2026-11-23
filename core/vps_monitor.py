@@ -4,6 +4,15 @@ import re
 import threading
 from PyQt6.QtCore import QThread, pyqtSignal
 
+
+def _safe_float(val, default=0.0):
+    """Safely convert numeric values (handling None) to float."""
+    try:
+        return float(val) if val is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
 class VPSMonitorThread(QThread):
     vps_metrics_updated = pyqtSignal(dict)
 
@@ -12,7 +21,27 @@ class VPSMonitorThread(QThread):
         self.config_manager = config_manager
         self.running = True
         self.ssh_client = None
+        self._ssh_conn_key = None
         self.last_cpu_stat = None
+
+    def _close_ssh_client(self):
+        """Safely close active SSH connection and reset differential CPU baseline."""
+        if self.ssh_client is not None:
+            try:
+                self.ssh_client.close()
+            except Exception:
+                pass
+            self.ssh_client = None
+        self._ssh_conn_key = None
+        self.last_cpu_stat = None
+
+    def _sleep_interruptible(self, seconds):
+        """Sleep in 100ms slices so stop() returns promptly."""
+        slices = max(1, int(float(seconds) * 10))
+        for _ in range(slices):
+            if not self.running:
+                break
+            time.sleep(0.1)
 
     def _get_vps_config(self):
         vps_cfg = self.config_manager.get("vps", {})
@@ -72,13 +101,19 @@ class VPSMonitorThread(QThread):
         latency = (time.time() - start) * 1000.0
         if resp.status_code == 200:
             data = resp.json()
+            raw_cpu = data.get("cpu") if data.get("cpu") is not None else data.get("cpu_percent")
+            raw_mem = data.get("mem") if data.get("mem") is not None else data.get("mem_percent")
+            raw_disk = data.get("disk") if data.get("disk") is not None else data.get("disk_percent")
             return {
                 "status": "ONLINE",
                 "ping_ms": round(latency, 1),
-                "cpu_percent": float(data.get("cpu", data.get("cpu_percent", 0))),
-                "mem_percent": float(data.get("mem", data.get("mem_percent", 0))),
-                "mem_used_gb": float(data.get("mem_used_gb", 0)),
-                "mem_total_gb": float(data.get("mem_total_gb", 0)),
+                "cpu_percent": _safe_float(raw_cpu),
+                "mem_percent": _safe_float(raw_mem),
+                "mem_used_gb": _safe_float(data.get("mem_used_gb")),
+                "mem_total_gb": _safe_float(data.get("mem_total_gb")),
+                "disk_percent": _safe_float(raw_disk),
+                "disk_used_gb": _safe_float(data.get("disk_used_gb")),
+                "disk_total_gb": _safe_float(data.get("disk_total_gb")),
                 "raw": data
             }
         return {"status": "ERROR", "ping_ms": None}
@@ -107,17 +142,27 @@ class VPSMonitorThread(QThread):
         """Query remote VPS via SSH without needing any software installed on VPS."""
         import paramiko
 
+        norm_key = (key_path or "").strip()
+        norm_pass = password or ""
+        conn_key = (host, int(port), username, norm_pass, norm_key)
+
+        if self.ssh_client is not None:
+            transport = self.ssh_client.get_transport()
+            if self._ssh_conn_key != conn_key or not transport or not transport.is_active():
+                self._close_ssh_client()
+
         if self.ssh_client is None:
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             try:
-                if key_path:
-                    client.connect(host, port=port, username=username, key_filename=key_path, timeout=timeout)
+                if norm_key:
+                    client.connect(host, port=port, username=username, key_filename=norm_key, timeout=timeout)
                 else:
-                    client.connect(host, port=port, username=username, password=password, timeout=timeout)
+                    client.connect(host, port=port, username=username, password=norm_pass, timeout=timeout)
                 self.ssh_client = client
+                self._ssh_conn_key = conn_key
             except Exception as e:
-                self.ssh_client = None
+                self._close_ssh_client()
                 return {
                     "status": "OFFLINE",
                     "error": str(e),
@@ -128,8 +173,12 @@ class VPSMonitorThread(QThread):
         # This completely bypasses local TUN/VPN proxies that falsely reply to TCP SYN in <1ms
         ssh_rtt = self._probe_ssh_rtt(timeout=2.0)
 
-        # Query /proc/stat and memory via free -b (procps standard)
-        cmd = "grep 'cpu ' /proc/stat; free -b 2>/dev/null || grep -E 'MemTotal|MemFree|Buffers|Cached|SReclaimable' /proc/meminfo"
+        # Query /proc/stat, memory (free -b / meminfo), and root `/` disk usage in one RTT
+        cmd = (
+            "grep 'cpu ' /proc/stat; "
+            "free -b 2>/dev/null || grep -E 'MemTotal|MemFree|Buffers|Cached|SReclaimable' /proc/meminfo; "
+            "echo __DISK_B__; df -B1 -P / 2>/dev/null || (echo __DISK_K__; df -k -P / 2>/dev/null)"
+        )
         try:
             t0 = time.perf_counter()
             stdin, stdout, stderr = self.ssh_client.exec_command(cmd, timeout=timeout)
@@ -193,6 +242,8 @@ class VPSMonitorThread(QThread):
                     if t_kb > 0:
                         mem_percent = round((used_kb / t_kb) * 100.0, 1)
 
+            disk_percent, disk_used_gb, disk_total_gb = self._parse_disk_usage(output)
+
             return {
                 "status": "ONLINE",
                 "ping_ms": ssh_rtt,
@@ -201,33 +252,63 @@ class VPSMonitorThread(QThread):
                 "mem_used_gb": mem_used_gb,
                 "mem_total_gb": mem_total_gb,
                 "mem_used_mb": mem_used_mb,
-                "mem_total_mb": mem_total_mb
+                "mem_total_mb": mem_total_mb,
+                "disk_percent": disk_percent,
+                "disk_used_gb": disk_used_gb,
+                "disk_total_gb": disk_total_gb
             }
         except Exception as e:
             # Drop connection on error so next cycle reconnects
-            try:
-                self.ssh_client.close()
-            except Exception:
-                pass
-            self.ssh_client = None
+            self._close_ssh_client()
             return {
                 "status": "ERROR",
                 "error": str(e),
                 "ping_ms": None
             }
 
+    @staticmethod
+    def _parse_disk_usage(output):
+        """Parse root `/` disk metrics from combined SSH output (`__DISK_B__` or `__DISK_K__`)."""
+        disk_percent = 0.0
+        disk_used_gb = 0.0
+        disk_total_gb = 0.0
+
+        disk_section = ""
+        unit_bytes = 1.0
+        if "__DISK_K__" in output:
+            disk_section = output.split("__DISK_K__", 1)[1]
+            unit_bytes = 1024.0
+        elif "__DISK_B__" in output:
+            disk_section = output.split("__DISK_B__", 1)[1]
+            unit_bytes = 1.0
+
+        if disk_section:
+            m = re.search(r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+/(?:\s*$)', disk_section, re.MULTILINE)
+            if m:
+                tot_b = int(m.group(1)) * unit_bytes
+                used_b = int(m.group(2)) * unit_bytes
+                if tot_b > 0:
+                    disk_total_gb = round(tot_b / (1024.0 ** 3), 2)
+                    disk_used_gb = round(used_b / (1024.0 ** 3), 2)
+                    disk_percent = round(max(0.0, min(100.0, (used_b / tot_b) * 100.0)), 1)
+
+        return disk_percent, disk_used_gb, disk_total_gb
+
     def run(self):
         while self.running:
             cfg = self._get_vps_config()
             if not cfg.get("enabled", True):
-                time.sleep(1.0)
+                self._close_ssh_client()
+                self._sleep_interruptible(1.0)
                 continue
 
             vps_type = cfg.get("type", "ping").lower()
             host = cfg.get("host", "").strip()
             port = int(cfg.get("port", 22))
             interval = max(2, int(cfg.get("refresh_interval_s", 5)))
-            
+            if vps_type != "ssh":
+                self._close_ssh_client()
+
             result = {
                 "name": cfg.get("name", "VPS-NODE"),
                 "status": "STANDBY",
@@ -237,13 +318,18 @@ class VPSMonitorThread(QThread):
                 "mem_percent": 0.0,
                 "mem_used_gb": 0.0,
                 "mem_total_gb": 0.0,
+                "disk_percent": 0.0,
+                "disk_used_gb": 0.0,
+                "disk_total_gb": 0.0,
                 "timestamp": time.time()
             }
 
-            if not host:
+            http_url = cfg.get("http_url", "").strip()
+            if (vps_type == "http" and not http_url) or (vps_type != "http" and not host):
+                self._close_ssh_client()
                 result["status"] = "UNCONFIGURED"
                 self.vps_metrics_updated.emit(result)
-                time.sleep(interval)
+                self._sleep_interruptible(interval)
                 continue
 
             try:
@@ -257,25 +343,20 @@ class VPSMonitorThread(QThread):
                         key_path=cfg.get("key_path", "")
                     )
                     result.update(ssh_res)
-                    # If SSH probe did not return ping_ms, fallback to measure_latency
-                    if result.get("ping_ms") is None:
+                    if result.get("status") == "ONLINE" and result.get("ping_ms") is None and host:
                         fallback_rtt = self.measure_latency(host, port)
                         if fallback_rtt is not None:
                             result["ping_ms"] = round(fallback_rtt, 1)
 
                 elif vps_type == "http":
-                    http_url = cfg.get("http_url", "")
-                    if http_url:
-                        http_res = self.query_http(http_url)
-                        result.update(http_res)
-                        if result.get("ping_ms") is None:
-                            fallback_rtt = self.measure_latency(host, port)
-                            if fallback_rtt is not None:
-                                result["ping_ms"] = round(fallback_rtt, 1)
-                    else:
-                        result["status"] = "UNCONFIGURED"
+                    http_res = self.query_http(http_url)
+                    result.update(http_res)
+                    if result.get("status") == "ONLINE" and result.get("ping_ms") is None and host:
+                        fallback_rtt = self.measure_latency(host, port)
+                        if fallback_rtt is not None:
+                            result["ping_ms"] = round(fallback_rtt, 1)
 
-                else: # ping
+                else:  # ping
                     rtt = self.measure_latency(host, port)
                     if rtt is not None:
                         result["status"] = "ONLINE"
@@ -288,17 +369,9 @@ class VPSMonitorThread(QThread):
                 result["error"] = str(e)
 
             self.vps_metrics_updated.emit(result)
-            # Sleep in slices so stop() returns immediately without hanging
-            for _ in range(int(interval * 10)):
-                if not self.running:
-                    break
-                time.sleep(0.1)
+            self._sleep_interruptible(interval)
 
     def stop(self):
         self.running = False
-        if self.ssh_client:
-            try:
-                self.ssh_client.close()
-            except Exception:
-                pass
+        self._close_ssh_client()
         self.wait(2000)
